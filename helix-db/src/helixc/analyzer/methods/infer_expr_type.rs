@@ -213,54 +213,41 @@ pub(crate) fn infer_expr_type<'a>(
                                             );
                                         } else {
                                             let variable_type = scope.get(value.as_str()).unwrap();
-                                            if variable_type
-                                                != &Type::from(
-                                                    field_set
-                                                        .get(field_name.as_str())
-                                                        .unwrap()
-                                                        .field_type
-                                                        .clone(),
-                                                )
-                                            {
-                                                generate_error!(
-                                                    ctx,
-                                                    original_query,
-                                                    loc.clone(),
-                                                    E205,
-                                                    value.as_str(),
-                                                    &variable_type.to_string(),
-                                                    &field_set
-                                                        .get(field_name.as_str())
-                                                        .unwrap()
-                                                        .field_type
-                                                        .to_string(),
-                                                    "node",
-                                                    ty.as_str()
-                                                );
+                                            if let Some(field_info) = field_set.get(field_name.as_str()) {
+                                                if variable_type != &Type::from(field_info.field_type.clone()) {
+                                                    generate_error!(
+                                                        ctx,
+                                                        original_query,
+                                                        loc.clone(),
+                                                        E205,
+                                                        value.as_str(),
+                                                        &variable_type.to_string(),
+                                                        &field_info.field_type.to_string(),
+                                                        "node",
+                                                        ty.as_str()
+                                                    );
+                                                }
                                             }
                                         }
                                     }
                                     ValueType::Literal { value, loc } => {
-                                        let field_type = ctx
-                                            .node_fields
-                                            .get(ty.as_str())
-                                            .unwrap()
-                                            .get(field_name.as_str())
-                                            .unwrap()
-                                            .field_type
-                                            .clone();
-                                        if field_type != *value {
-                                            generate_error!(
-                                                ctx,
-                                                original_query,
-                                                loc.clone(),
-                                                E205,
-                                                &value.inner_stringify(),
-                                                value.to_variant_string(),
-                                                &field_type.to_string(),
-                                                "node",
-                                                ty.as_str()
-                                            );
+                                        if let Some(node_fields) = ctx.node_fields.get(ty.as_str()) {
+                                            if let Some(field_info) = node_fields.get(field_name.as_str()) {
+                                                let field_type = field_info.field_type.clone();
+                                                if field_type != *value {
+                                                    generate_error!(
+                                                        ctx,
+                                                        original_query,
+                                                        loc.clone(),
+                                                        E205,
+                                                        &value.inner_stringify(),
+                                                        value.to_variant_string(),
+                                                        &field_type.to_string(),
+                                                        "node",
+                                                        ty.as_str()
+                                                    );
+                                                }
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -274,15 +261,14 @@ pub(crate) fn infer_expr_type<'a>(
                                     field_name.clone(),
                                     match value {
                                         ValueType::Literal { value, loc } => {
-                                            match ctx
+                                            let is_date_field = ctx
                                                 .node_fields
                                                 .get(ty.as_str())
-                                                .unwrap()
-                                                .get(field_name.as_str())
-                                                .unwrap()
-                                                .field_type
-                                                == FieldType::Date
-                                            {
+                                                .and_then(|fields| fields.get(field_name.as_str()))
+                                                .map(|field_info| field_info.field_type == FieldType::Date)
+                                                .unwrap_or(false);
+
+                                            match is_date_field {
                                                 true => match Date::new(value) {
                                                     Ok(date) => GeneratedValue::Literal(
                                                         GenRef::Literal(date.to_rfc3339()),
@@ -429,55 +415,42 @@ pub(crate) fn infer_expr_type<'a>(
                                             );
                                         } else {
                                             let variable_type = scope.get(value.as_str()).unwrap();
-                                            if variable_type
-                                                != &Type::from(
-                                                    field_set
-                                                        .get(field_name.as_str())
-                                                        .unwrap()
-                                                        .field_type
-                                                        .clone(),
-                                                )
-                                            {
-                                                generate_error!(
-                                                    ctx,
-                                                    original_query,
-                                                    loc.clone(),
-                                                    E205,
-                                                    value.as_str(),
-                                                    &variable_type.to_string(),
-                                                    &field_set
-                                                        .get(field_name.as_str())
-                                                        .unwrap()
-                                                        .field_type
-                                                        .to_string(),
-                                                    "edge",
-                                                    ty.as_str()
-                                                );
+                                            if let Some(field_info) = field_set.get(field_name.as_str()) {
+                                                if variable_type != &Type::from(field_info.field_type.clone()) {
+                                                    generate_error!(
+                                                        ctx,
+                                                        original_query,
+                                                        loc.clone(),
+                                                        E205,
+                                                        value.as_str(),
+                                                        &variable_type.to_string(),
+                                                        &field_info.field_type.to_string(),
+                                                        "edge",
+                                                        ty.as_str()
+                                                    );
+                                                }
                                             }
                                         }
                                     }
                                     ValueType::Literal { value, loc } => {
                                         // check against type
-                                        let field_type = ctx
-                                            .edge_fields
-                                            .get(ty.as_str())
-                                            .unwrap()
-                                            .get(field_name.as_str())
-                                            .unwrap()
-                                            .field_type
-                                            .clone();
-                                        if field_type != *value {
-                                            generate_error!(
-                                                ctx,
-                                                original_query,
-                                                loc.clone(),
-                                                E205,
-                                                &value.inner_stringify(),
-                                                value.to_variant_string(),
-                                                &field_type.to_string(),
-                                                "edge",
-                                                ty.as_str()
-                                            );
+                                        if let Some(edge_fields) = ctx.edge_fields.get(ty.as_str()) {
+                                            if let Some(field_info) = edge_fields.get(field_name.as_str()) {
+                                                let field_type = field_info.field_type.clone();
+                                                if field_type != *value {
+                                                    generate_error!(
+                                                        ctx,
+                                                        original_query,
+                                                        loc.clone(),
+                                                        E205,
+                                                        &value.inner_stringify(),
+                                                        value.to_variant_string(),
+                                                        &field_type.to_string(),
+                                                        "edge",
+                                                        ty.as_str()
+                                                    );
+                                                }
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -492,15 +465,14 @@ pub(crate) fn infer_expr_type<'a>(
                                         field_name.clone(),
                                         match value {
                                             ValueType::Literal { value, loc } => {
-                                                match ctx
+                                                let is_date_field = ctx
                                                     .edge_fields
                                                     .get(ty.as_str())
-                                                    .unwrap()
-                                                    .get(field_name.as_str())
-                                                    .unwrap()
-                                                    .field_type
-                                                    == FieldType::Date
-                                                {
+                                                    .and_then(|fields| fields.get(field_name.as_str()))
+                                                    .map(|field_info| field_info.field_type == FieldType::Date)
+                                                    .unwrap_or(false);
+
+                                                match is_date_field {
                                                     true => match Date::new(value) {
                                                         Ok(date) => GeneratedValue::Literal(
                                                             GenRef::Literal(date.to_rfc3339()),
@@ -651,55 +623,42 @@ pub(crate) fn infer_expr_type<'a>(
                                             );
                                         } else {
                                             let variable_type = scope.get(value.as_str()).unwrap();
-                                            if variable_type
-                                                != &Type::from(
-                                                    field_set
-                                                        .get(field_name.as_str())
-                                                        .unwrap()
-                                                        .field_type
-                                                        .clone(),
-                                                )
-                                            {
-                                                generate_error!(
-                                                    ctx,
-                                                    original_query,
-                                                    loc.clone(),
-                                                    E205,
-                                                    value.as_str(),
-                                                    &variable_type.to_string(),
-                                                    &field_set
-                                                        .get(field_name.as_str())
-                                                        .unwrap()
-                                                        .field_type
-                                                        .to_string(),
-                                                    "vector",
-                                                    ty.as_str()
-                                                );
+                                            if let Some(field_info) = field_set.get(field_name.as_str()) {
+                                                if variable_type != &Type::from(field_info.field_type.clone()) {
+                                                    generate_error!(
+                                                        ctx,
+                                                        original_query,
+                                                        loc.clone(),
+                                                        E205,
+                                                        value.as_str(),
+                                                        &variable_type.to_string(),
+                                                        &field_info.field_type.to_string(),
+                                                        "vector",
+                                                        ty.as_str()
+                                                    );
+                                                }
                                             }
                                         }
                                     }
                                     ValueType::Literal { value, loc } => {
                                         // check against type
-                                        let field_type = ctx
-                                            .vector_fields
-                                            .get(ty.as_str())
-                                            .unwrap()
-                                            .get(field_name.as_str())
-                                            .unwrap()
-                                            .field_type
-                                            .clone();
-                                        if field_type != *value {
-                                            generate_error!(
-                                                ctx,
-                                                original_query,
-                                                loc.clone(),
-                                                E205,
-                                                value.as_str(),
-                                                &value.to_variant_string(),
-                                                &field_type.to_string(),
-                                                "vector",
-                                                ty.as_str()
-                                            );
+                                        if let Some(vector_fields) = ctx.vector_fields.get(ty.as_str()) {
+                                            if let Some(field_info) = vector_fields.get(field_name.as_str()) {
+                                                let field_type = field_info.field_type.clone();
+                                                if field_type != *value {
+                                                    generate_error!(
+                                                        ctx,
+                                                        original_query,
+                                                        loc.clone(),
+                                                        E205,
+                                                        value.as_str(),
+                                                        &value.to_variant_string(),
+                                                        &field_type.to_string(),
+                                                        "vector",
+                                                        ty.as_str()
+                                                    );
+                                                }
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -714,15 +673,14 @@ pub(crate) fn infer_expr_type<'a>(
                                     field_name.clone(),
                                     match value {
                                         ValueType::Literal { value, loc } => {
-                                            match ctx
+                                            let is_date_field = ctx
                                                 .vector_fields
                                                 .get(ty.as_str())
-                                                .unwrap()
-                                                .get(field_name.as_str())
-                                                .unwrap()
-                                                .field_type
-                                                == FieldType::Date
-                                            {
+                                                .and_then(|fields| fields.get(field_name.as_str()))
+                                                .map(|field_info| field_info.field_type == FieldType::Date)
+                                                .unwrap_or(false);
+
+                                            match is_date_field {
                                                 true => match Date::new(value) {
                                                     Ok(date) => GeneratedValue::Literal(
                                                         GenRef::Literal(date.to_rfc3339()),
